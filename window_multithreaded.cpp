@@ -55,6 +55,9 @@
 #include <QQuickRenderControl>
 #include <QCoreApplication>
 
+#include <Qt3DRender/QRenderSettings>
+#include <Qt3DRender/QRenderSurfaceSelector>
+
 /*
   This implementation runs the Qt Quick scenegraph's sync and render phases on a
   separate, dedicated thread.  Rendering the cube using our custom OpenGL engine
@@ -379,6 +382,31 @@ void WindowMultiThreaded::run()
 
     // The root item is ready. Associate it with the window.
     m_rootItem->setParentItem(m_quickWindow->contentItem());
+
+
+    Qt3DRender::QRenderSettings *frameGraphComponent
+        = m_rootItem->findChild<Qt3DRender::QRenderSettings *>();
+    if (frameGraphComponent) {
+        Qt3DCore::QNode *frameGraphRoot = frameGraphComponent->activeFrameGraph();
+        if (!frameGraphRoot) {
+            qWarning() << "No active frame graph found";
+            return;
+        }
+
+        Qt3DRender::QRenderSurfaceSelector *surfaceSelector
+            = frameGraphRoot->findChild<Qt3DRender::QRenderSurfaceSelector *>();
+        if (!surfaceSelector) {
+            qWarning() << "No render surface selector found in frame graph";
+            return;
+        }
+
+        // explicitly render to offscreen surface
+        surfaceSelector->setSurface(m_offscreenSurface);
+    }
+    else
+    {
+        qInfo() << "No frame graph component/Scene3D found";
+    }
 
     // Update item and rendering related geometries.
     updateSizes();

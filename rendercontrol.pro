@@ -1,6 +1,6 @@
 TEMPLATE = app
 
-QT += quick qml
+QT += quick qml 3dinput 3dextras
 
 SOURCES += main.cpp \
            window_singlethreaded.cpp \

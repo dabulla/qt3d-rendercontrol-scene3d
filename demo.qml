@@ -49,7 +49,12 @@
 ****************************************************************************/
 
 import QtQuick 2.0
-import QtQuick.Particles 2.0
+import Qt3D.Core 2.0
+import Qt3D.Render 2.0
+import Qt3D.Input 2.0
+import Qt3D.Extras 2.0
+import QtQuick.Scene3D 2.0
+
 
 Rectangle {
     id: root
@@ -59,147 +64,114 @@ Rectangle {
         GradientStop { position: 1; color: "black" }
     }
 
-    Text {
-        anchors.centerIn: parent
-        text: "Qt Quick in a texture"
-        font.pointSize: 40
-        color: "white"
-
-        SequentialAnimation on rotation {
-            PauseAnimation { duration: 2500 }
-            NumberAnimation { from: 0; to: 360; duration: 5000; easing.type: Easing.InOutCubic }
-            loops: Animation.Infinite
-        }
-    }
-
-    ParticleSystem {
-        id: particles
+    Scene3D {
+        id: scene3d
         anchors.fill: parent
+        anchors.margins: 10
+        focus: true
+        aspects: ["input", "logic"]
+        cameraAspectRatioMode: Scene3D.AutomaticAspectRatio
 
-        ImageParticle {
-            id: smoke
-            system: particles
-            anchors.fill: parent
-            groups: ["A", "B"]
-            source: "qrc:///particleresources/glowdot.png"
-            colorVariation: 0
-            color: "#00111111"
-        }
-        ImageParticle {
-            id: flame
-            anchors.fill: parent
-            system: particles
-            groups: ["C", "D"]
-            source: "qrc:///particleresources/glowdot.png"
-            colorVariation: 0.1
-            color: "#00ff400f"
-        }
+        Entity {
+            id: sceneRoot
 
-        Emitter {
-            id: fire
-            system: particles
-            group: "C"
+            Camera {
+                id: cameraMain
+                projectionType: CameraLens.PerspectiveProjection
+                fieldOfView: 45
+                nearPlane : 0.1
+                farPlane : 1000.0
+                position: Qt.vector3d( 0.0, 0.0, 40.0 )
+                upVector: Qt.vector3d( 0.0, 1.0, 0.0 )
+                viewCenter: Qt.vector3d( 0.0, 0.0, 0.0 )
+            }
 
-            y: parent.height
-            width: parent.width
+            FirstPersonCameraController { camera: cameraMain }
 
-            emitRate: 350
-            lifeSpan: 3500
+            components: [
+                RenderSettings {
+                    Viewport {
+                        id: viewport
+                        normalizedRect: Qt.rect(0.0, 0.0, 1.0, 1.0)
+                        RenderSurfaceSelector {
+                            id: surfaceSelector
+                            CameraSelector {
+                                id : cameraSelector
+                                camera: cameraMain
+                                ClearBuffers {
+                                    buffers : ClearBuffers.ColorDepthBuffer
+                                    clearColor: "transparent"
+                                    clearDepthValue: 1
+                                    RenderStateSet {
+                                        renderStates: [
+                                            //FIXME: For single threaded renderer OpenGL state seems to differ from what Qt3D thinks it is.
+                                            DepthTest { depthFunction: DepthTest.LessOrEqual }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                InputSettings { }
+            ]
 
-            acceleration: PointDirection { y: -17; xVariation: 3 }
-            velocity: PointDirection {xVariation: 3}
+            PhongMaterial {
+                id: material
+            }
 
-            size: 24
-            sizeVariation: 8
-            endSize: 4
-        }
+            TorusMesh {
+                id: torusMesh
+                radius: 5
+                minorRadius: 1
+                rings: 100
+                slices: 20
+            }
 
-        TrailEmitter {
-            id: fireSmoke
-            group: "B"
-            system: particles
-            follow: "C"
-            width: root.width
-            height: root.height - 68
+            Transform {
+                id: torusTransform
+                scale3D: Qt.vector3d(1.5, 1, 0.5)
+                rotation: fromAxisAndAngle(Qt.vector3d(1, 0, 0), 45)
+            }
 
-            emitRatePerParticle: 1
-            lifeSpan: 2000
+            Entity {
+                id: torusEntity
+                components: [ torusMesh, material, torusTransform ]
+            }
 
-            velocity: PointDirection {y:-17*6; yVariation: -17; xVariation: 3}
-            acceleration: PointDirection {xVariation: 3}
+            SphereMesh {
+                id: sphereMesh
+                radius: 3
+            }
 
-            size: 36
-            sizeVariation: 8
-            endSize: 16
-        }
+            Transform {
+                id: sphereTransform
+                property real userAngle: 0.0
+                matrix: {
+                    var m = Qt.matrix4x4();
+                    m.rotate(userAngle, Qt.vector3d(0, 1, 0))
+                    m.translate(Qt.vector3d(20, 0, 0));
+                    return m;
+                }
+            }
 
-        TrailEmitter {
-            id: fireballFlame
-            anchors.fill: parent
-            system: particles
-            group: "D"
-            follow: "E"
+            NumberAnimation {
+                target: sphereTransform
+                property: "userAngle"
+                duration: 10000
+                from: 0
+                to: 360
 
-            emitRatePerParticle: 120
-            lifeSpan: 180
-            emitWidth: TrailEmitter.ParticleSize
-            emitHeight: TrailEmitter.ParticleSize
-            emitShape: EllipseShape{}
+                loops: Animation.Infinite
+                running: true
+            }
 
-            size: 16
-            sizeVariation: 4
-            endSize: 4
-        }
-
-        TrailEmitter {
-            id: fireballSmoke
-            anchors.fill: parent
-            system: particles
-            group: "A"
-            follow: "E"
-
-            emitRatePerParticle: 128
-            lifeSpan: 2400
-            emitWidth: TrailEmitter.ParticleSize
-            emitHeight: TrailEmitter.ParticleSize
-            emitShape: EllipseShape{}
-
-            velocity: PointDirection {yVariation: 16; xVariation: 16}
-            acceleration: PointDirection {y: -16}
-
-            size: 24
-            sizeVariation: 8
-            endSize: 8
-        }
-
-        Emitter {
-            id: balls
-            system: particles
-            group: "E"
-
-            y: parent.height
-            width: parent.width
-
-            emitRate: 2
-            lifeSpan: 7000
-
-            velocity: PointDirection {y:-17*4*2; xVariation: 6*6}
-            acceleration: PointDirection {y: 17*2; xVariation: 6*6}
-
-            size: 8
-            sizeVariation: 4
-        }
-
-        Turbulence { //A bit of turbulence makes the smoke look better
-            anchors.fill: parent
-            groups: ["A","B"]
-            strength: 32
-            system: particles
+            Entity {
+                id: sphereEntity
+                components: [ sphereMesh, material, sphereTransform ]
+            }
         }
     }
-
-    onWidthChanged: particles.reset()
-    onHeightChanged: particles.reset()
 
     MouseArea {
         id: mouse

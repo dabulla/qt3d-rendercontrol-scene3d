@@ -56,6 +56,9 @@
 #include <QQuickRenderControl>
 #include <QCoreApplication>
 
+#include <Qt3DRender/QRenderSettings>
+#include <Qt3DRender/QRenderSurfaceSelector>
+
 class RenderControl : public QQuickRenderControl
 {
 public:
@@ -232,6 +235,30 @@ void WindowSingleThreaded::run()
 
     // The root item is ready. Associate it with the window.
     m_rootItem->setParentItem(m_quickWindow->contentItem());
+
+    Qt3DRender::QRenderSettings *frameGraphComponent
+        = m_rootItem->findChild<Qt3DRender::QRenderSettings *>();
+    if (frameGraphComponent) {
+        Qt3DCore::QNode *frameGraphRoot = frameGraphComponent->activeFrameGraph();
+        if (!frameGraphRoot) {
+            qWarning() << "No active frame graph found";
+            return;
+        }
+
+        Qt3DRender::QRenderSurfaceSelector *surfaceSelector
+            = frameGraphRoot->findChild<Qt3DRender::QRenderSurfaceSelector *>();
+        if (!surfaceSelector) {
+            qWarning() << "No render surface selector found in frame graph";
+            return;
+        }
+
+        // explicitly render to offscreen surface
+        surfaceSelector->setSurface(m_offscreenSurface);
+    }
+    else
+    {
+        qInfo() << "No frame graph component/Scene3D found";
+    }
 
     // Update item and rendering related geometries.
     updateSizes();
